@@ -95,6 +95,7 @@ def one_point_crossover(cross_point, mother_index, father_index):
 	son_2 = np.concatenate([father_cromosome[0:cross_point], \
 						mother_cromosome[cross_point:]])
 
+	print(son_1,"...........",son_2)
 	print(*son_1, sep='')
 	print(*son_2, sep='')
 
