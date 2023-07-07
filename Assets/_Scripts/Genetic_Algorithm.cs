@@ -1,234 +1,199 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using System.Linq;
-
-public class Genetic_Algorithm : MonoBehaviour
+namespace AlgoritmoGenetico
 {
-    const int n_population = 4;
-    public static int cromosome_size = 20;
-    int iteration = 50;
-    float cross_prob = 0.9f;
-    int cros_point = 3;
-    float mutation_prob = 0.15f;
+    using System.Collections;
+    using System.Collections.Generic;
+    using UnityEngine;
+    using UnityEngine.UI;
 
-    public static List<List<float>> matrix_population = new List<List<float>>();
-
-    public GameObject prefab;
-    public Text tex_iteration;
-    void generate_population()
+    public class Genetic_Algorithm : MonoBehaviour
     {
-        for (int i = 0; i < n_population; i++)
+        const int n_population = 30;
+        public int cromosome_size = 150;
+        float mutation_prob = 0.15f;
+        public Transform Origen;
+        public GameObject prefab;
+
+        public static List<Individuo> population;
+
+        private void Start()
         {
-            List<float> M_temporal = new List<float>();
-            for (int j = 0; j < cromosome_size; j++)
+            population = generate_population();
+            StartCoroutine(StartGeneticAlgorithm());
+        }
+
+        private List<Individuo> generate_population()
+        {
+            List<Individuo> initialPopulation = new List<Individuo>();
+
+            for (int i = 0; i < n_population; i++)
             {
-                M_temporal.Add(Random.Range(0, 2)); // valores del cromosoma
+                Individuo individual = new Individuo(cromosome_size);
+                initialPopulation.Add(individual);
             }
-            // M_temporal.Add(0); // fitness del cromosoma
 
-            matrix_population.Add(M_temporal);
-
-
-
-        }
-        // matrix_population.Clear();
-
-    }
-
-    float fitness_function(List<float> pos)
-    {
-        float summa_data = 0;
-        foreach (var item in pos)
-        {
-            summa_data += item;
-        }
-        return summa_data;
-    }
-    void eval_population()
-    {
-        foreach (var item in matrix_population)
-        {
-            float temporal = fitness_function(item);
-            item.Add(temporal);
+            return initialPopulation;
         }
 
-    }
-
-    int get_parent_tournament_selectio(int KA)
-    {
-        List<List<float>> mP = matrix_population.OrderBy(x => x.LastOrDefault()).ToList();
-        int t = Random.Range(0, KA);
-        return t;
-    }
-
-    int[,] tournament_selection()
-    {
-        int[,] selected = new int[1, 2];
-
-        int mother_index = 0;
-        int father_index = 0;
-
-        while (mother_index == father_index)
+        private Individuo GetBestFitness()
         {
-            mother_index = get_parent_tournament_selectio(3);
-            father_index = get_parent_tournament_selectio(3);
+            Individuo fittestIndividual = population[0];
 
-            if (mother_index != father_index)
+            foreach (Individuo individual in population)
             {
-                selected[0, 0] = mother_index;
-                selected[0, 1] = father_index;
-                break;
+                if (individual.fitness > fittestIndividual.fitness)
+                {
+                    fittestIndividual = individual;
+                }
             }
-        }
-        return selected;
-    }
 
-
-    List<List<float>> one_point_crossover(int mother_index, int father_index)
-    {
-        List<List<float>> hijos = new List<List<float>>();
-        List<float> son1 = new List<float>();
-        List<float> son2 = new List<float>();
-
-        for (int i = 0; i < cros_point; i++)
-        {
-            son1.Add(matrix_population[mother_index][i]);
-            son2.Add(matrix_population[father_index][i]);
-        }
-        for (int i = cros_point; i < cromosome_size; i++)
-        {
-            son1.Add(matrix_population[father_index][i]);
-            son2.Add(matrix_population[mother_index][i]);
-        }
-        string a = "";
-        string b = "";
-
-        for (int i = 0; i < cromosome_size; i++)
-        {
-            a += son1[i];
-            b += son2[i];
+            return fittestIndividual;
         }
 
-        print("hijo a = " + a);
-        print("hijo b = " + b);
-        hijos.Add(son1);
-        hijos.Add(son2);
-        return hijos;
-
-    }
-
-    void selecting_next_population()
-    {
-        int resta = matrix_population.Count - n_population;
-        matrix_population = matrix_population.OrderBy(x => x.LastOrDefault()).ToList();
-
-        print("********************************************************************");
-        
-        matrix_population.RemoveRange(resta, resta);
-
-    }
-
-
-    void Print_Pulation_value()
-    {
-
-        foreach (var item in matrix_population)
+        private Individuo SelectParent()
         {
-            string temporal = "";
-            for (int j = 0; j < item.Count(); j++)
+            // Seleccion de ruleta
+            float totalFitness = 0;
+            foreach (Individuo individual in population)
             {
-                temporal += item[j].ToString() + " ";
+                totalFitness += individual.fitness;
             }
-            print("cromosoma = " + temporal);
+
+            population.Sort((x, y) => x.fitness.CompareTo(y.fitness));
+
+
+            foreach (Individuo individual in population)
+            {
+                individual.PorcentajeFitness = (individual.fitness * 100) / totalFitness;
+            }
+
+            float randomFitness = Random.Range(0, 100);
+            float TopeA = 0;
+            float TopeB = 0;
+            for (int i = 0; i < population.Count; i++)
+            {
+                TopeB = TopeA + population[i].PorcentajeFitness;
+                if (randomFitness >= TopeA && randomFitness <= TopeB)
+                    return population[i];
+
+                TopeA = TopeB;
+            }
+
+            return null;
         }
 
-    }
-
-    IEnumerator genetic_algorithm()
-    {
-        generate_population();
-        eval_population();
-
-        for (int i = 0; i < iteration; i++)
+        private Individuo Crossover(Individuo parent1, Individuo parent2)
         {
-            List<List<float>> tempo_list = new List<List<float>>();
-            print("______________Iteracion_________" + i);
-            
-            tex_iteration.text=i.ToString();
+
+            Individuo child = new Individuo(cromosome_size);
+
+            int crossoverPoint = Random.Range(0, cromosome_size);
+
+            for (int i = 0; i < cromosome_size; i++)
+            {
+                if (i < crossoverPoint)
+                {
+                    child.chromosome[i] = parent1.chromosome[i];
+                }
+                else
+                {
+                    child.chromosome[i] = parent2.chromosome[i];
+                }
+            }
+
+            return child;
+        }
+
+        private void Mutate(Individuo individual)
+        {
+            for (int i = 0; i < individual.chromosome.Length; i++)
+            {
+                if (Random.value < mutation_prob)
+                {
+                    individual.chromosome[i] = (MovementType)Random.Range(0, (int)MovementType.Count);
+                }
+            }
+        }
+
+        private List<Individuo> GenerateNewPopulation()
+        {
+            List<Individuo> newPopulation = new List<Individuo>();
+
+            for (int i = 0; i < n_population / 2; i++)
+            {
+                // Selection
+                Individuo parent1 = SelectParent();
+                Individuo parent2 = SelectParent();
+
+                // Crossover
+                parent1.ShowCromosomas();
+                parent2.ShowCromosomas();
+                Individuo child = Crossover(parent1, parent2);
+
+                // Mutation
+                Mutate(child);
+
+                newPopulation.Add(child);
+            }
+
+            return newPopulation;
+        }
+
+        private void EvaluateFitness()
+        {
+            foreach (Individuo individuo in population)
+            {
+                // Reset cube position to the start point
+                GameObject obj = Instantiate(prefab, Origen.position, Origen.rotation);
+                obj.GetComponent<Renderer>().material.color =
+                new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
+                obj.GetComponent<AgentesAG>().individuo = individuo;
+
+            }
+            population.Clear();
+        }
+
+        private IEnumerator StartGeneticAlgorithm()
+        {
+            int generation = 0;
+            List<Individuo> BestParents = new List<Individuo>();
 
             while (true)
             {
-                if (matrix_population.Count + tempo_list.Count >= n_population * 2)
+
+                EvaluateFitness();
+
+                yield return new WaitUntil(() => population.Count == n_population);
+
+                Individuo fittestIndividual = GetBestFitness();
+
+
+                // Reproduce and generate a new population
+                List<Individuo> newPopulation = GenerateNewPopulation();
+                for (int i = 0; i < n_population; i++)
                 {
-                    break;
-                }
-                // if (Random.Range(0, 100) <= cross_prob * 100) //Crossove  Prob
-                // {
-                int[,] selected = tournament_selection();
-
-                List<List<float>> offspring = one_point_crossover(selected[0, 0], selected[0, 1]);
-
-                foreach (var son in offspring)
-                {
-                    if (Random.Range(0, 100) <= mutation_prob * 100)
-                    { // Mutation Prob
-                        print("Mutation");
-                        for (int yy = 0; yy < son.Count; yy++)
-                        {
-                            if (son[yy] == 0)
-                            {
-                                son[yy] = 1;
-                                break;
-                            }
-                        }
-                    }
-                    float summa_data = fitness_function(son);
-                    son.Add(summa_data);
-
-                    tempo_list.Add(son);
+                    if (i < n_population / 2)
+                        BestParents.Add(newPopulation[i]);
+                    else
+                        BestParents.Add(population[i]);
                 }
 
-                // }
+                // print(BestParents.Count);
+                population.Clear();
+                foreach (var item in BestParents)
+                {
+                    population.Add(item);
+                }
+                BestParents.Clear();
+                // print(population.Count);
+
+
+                Debug.Log("Generation: " + generation + ", Fitness: " + fittestIndividual.fitness);
+
+                generation++;
+
+                yield return null;
             }
-
-            foreach (var item in tempo_list)
-            {
-                matrix_population.Add(item);
-            }
-
-
-            int t=0;
-            foreach (var item in matrix_population)
-            {
-                GameObject obj = Instantiate(prefab, new Vector3(-10, 0, t), Quaternion.identity);
-                obj.GetComponent<Renderer>().material.color = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f)); ;
-                obj.GetComponent<AgentesAG>().CromosomaCamino = item;
-                t+=4;
-            }
-
-            matrix_population.Clear();
-
-            while (matrix_population.Count != n_population * 2)
-            {
-                yield return new WaitForSeconds(1);
-                // print(matrix_population.Count());
-            }
-
-
-            selecting_next_population();
-            print("-----------------------------------------");
-            Print_Pulation_value();
-
-
-
         }
-    }
 
-    private void Start()
-    {
-        StartCoroutine(genetic_algorithm());
     }
-
 }
